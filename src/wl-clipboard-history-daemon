@@ -11,6 +11,18 @@ CONFIG_FILE="$CONFIG_DIR/config.ini"
 mkdir -p "$CONFIG_DIR" "$MEDIA_DIR"
 [[ -f "$HISTORY_FILE" ]] || touch "$HISTORY_FILE"
 
+# Auto-scaffold config files from system templates if missing
+if [[ ! -f "$CONFIG_FILE" ]]; then
+    if [[ -f "/usr/share/wl-clipboard-history/config.ini" ]]; then
+        cp "/usr/share/wl-clipboard-history/config.ini" "$CONFIG_FILE"
+    fi
+fi
+if [[ ! -f "$CONFIG_DIR/style.css" ]]; then
+    if [[ -f "/usr/share/wl-clipboard-history/style.css" ]]; then
+        cp "/usr/share/wl-clipboard-history/style.css" "$CONFIG_DIR/style.css"
+    fi
+fi
+
 # Robust configuration parser mimicking the C implementation
 get_config_val() {
     local key="$1"

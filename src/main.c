@@ -51,11 +51,15 @@ static void load_custom_css(void) {
     // Read css and replace placeholders with config variables
     FILE *f = fopen(css_path, "r");
     if (!f) {
-        // Fallback to local config/style.css if running in repo/development
-        f = fopen("config/style.css", "r");
+        // Fallback to system-wide template if installed via pacman/AUR
+        f = fopen("/usr/share/wl-clipboard-history/style.css", "r");
         if (!f) {
-            g_object_unref(provider);
-            return;
+            // Fallback to local config/style.css if running in repo/development
+            f = fopen("config/style.css", "r");
+            if (!f) {
+                g_object_unref(provider);
+                return;
+            }
         }
     }
 
