@@ -428,7 +428,7 @@ int main(int argc, char **argv) {
             printf("  hl.exec_cmd(\"pkill -f wl-clipboard-history-daemon; wl-clipboard-history-daemon &\")\n");
             printf("  hl.exec_cmd(\"hyprctl keyword windowrulev2 float,title:^(Clipboard History)$\")\n");
             printf("  hl.exec_cmd(\"hyprctl keyword windowrulev2 size 450 500,title:^(Clipboard History)$\")\n");
-            printf("  hl.exec_cmd(\"hyprctl keyword windowrulev2 move cursor -50% -50%,title:^(Clipboard History)$\")\n");
+            printf("  hl.exec_cmd(\"hyprctl keyword windowrulev2 move cursor -50%% -50%%,title:^(Clipboard History)$\")\n");
             printf("  hl.exec_cmd(\"hyprctl keyword windowrulev2 pin,title:^(Clipboard History)$\")\n");
             printf("  hl.exec_cmd(\"hyprctl keyword windowrulev2 stayfocused,title:^(Clipboard History)$\")\n");
             return 0;

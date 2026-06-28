@@ -80,7 +80,7 @@ handle_change() {
         type="image"
         local tmp_img
         tmp_img=$(mktemp)
-        wl-paste -t image/png > "$tmp_img" 2>/dev/null
+        timeout 2 wl-paste -t image/png > "$tmp_img" 2>/dev/null
         if [[ ! -s "$tmp_img" ]]; then
             rm -f "$tmp_img"
             return
@@ -96,11 +96,11 @@ handle_change() {
         content="$cached_img"
     elif echo "$targets" | grep -q "text/uri-list"; then
         type="files"
-        content=$(wl-paste -t text/uri-list 2>/dev/null)
+        content=$(timeout 2 wl-paste -t text/uri-list 2>/dev/null)
         content="${content//$'\n'/$'\a'}"
     elif echo "$targets" | grep -q "text/plain"; then
         type="text"
-        content=$(wl-paste -t text/plain 2>/dev/null)
+        content=$(timeout 2 wl-paste -t text/plain 2>/dev/null)
         content="${content//$'\n'/$'\a'}"
     else
         return
@@ -156,6 +156,9 @@ handle_change() {
 if [[ "$1" == "--update" ]]; then
     handle_change
 else
+    # Kill any previous wl-paste watch processes of this daemon to prevent duplicates on reload
+    pgrep -f "wl-paste.*wl-clipboard-history-daemon" | xargs kill 2>/dev/null || true
+
     RESET_ON_LOGIN=$(get_config_val "reset_on_login" "false")
     if [[ "$RESET_ON_LOGIN" == "true" ]]; then
         echo -n "" > "$HISTORY_FILE"
