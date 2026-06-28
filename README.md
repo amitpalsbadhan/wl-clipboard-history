@@ -42,23 +42,21 @@ cd wl-clipboard-history
 
 ## ⚙️ Hyprland Setup (Lua 2026 Config)
 
-Add the following snippets to your Hyprland Lua configuration file (`~/.config/hypr/hyprland.lua` or similar):
+Add the following snippets to your Hyprland Lua configuration file (`~/.config/hypr/hyprland.lua`):
 
 ```lua
--- 1. Start tracker daemon inside hyprland.start
-hl.on("hyprland.start", function()
-    hl.exec_cmd("wl-clipboard-history-daemon")
-end)
-
--- 2. Bind SUPER+V (Win+V) to launch the popup GUI
+-- 1. Bind SUPER+V (Win+V) to launch the popup GUI
 hl.bind(mainMod .. " + V", hl.dsp.exec_cmd("wl-clipboard-history-gui"))
 
--- 3. Add window rules for beautiful floating, centered ricing
-hl.exec_cmd("hyprctl keyword windowrulev2 float,class:^(org.hyprland.wl-clipboard-history)$")
-hl.exec_cmd("hyprctl keyword windowrulev2 size 450 500,class:^(org.hyprland.wl-clipboard-history)$")
-hl.exec_cmd("hyprctl keyword windowrulev2 center,class:^(org.hyprland.wl-clipboard-history)$")
-hl.exec_cmd("hyprctl keyword windowrulev2 pin,class:^(org.hyprland.wl-clipboard-history)$")
-hl.exec_cmd("hyprctl keyword windowrulev2 stayfocused,class:^(org.hyprland.wl-clipboard-history)$")
+-- 2. Start/reload tracker daemon on config load (auto-kills previous processes)
+hl.exec_cmd("pkill -f wl-clipboard-history-daemon; wl-clipboard-history-daemon &")
+
+-- 3. Add window rules for beautiful floating, cursor-centered ricing (matched robustly on Title)
+hl.exec_cmd("hyprctl keyword windowrulev2 float,title:^(Clipboard History)$")
+hl.exec_cmd("hyprctl keyword windowrulev2 size 450 500,title:^(Clipboard History)$")
+hl.exec_cmd("hyprctl keyword windowrulev2 move cursor -50% -50%,title:^(Clipboard History)$")
+hl.exec_cmd("hyprctl keyword windowrulev2 pin,title:^(Clipboard History)$")
+hl.exec_cmd("hyprctl keyword windowrulev2 stayfocused,title:^(Clipboard History)$")
 ```
 
 ---

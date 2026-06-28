@@ -422,18 +422,15 @@ int main(int argc, char **argv) {
             printf("Options:\n");
             printf("  -h, --help     Show this help message and exit\n\n");
             printf("Hyprland 2026 Lua Setup:\n");
-            printf("  -- 1. Start tracker daemon inside hyprland.start\n");
-            printf("  hl.on(\"hyprland.start\", function()\n");
-            printf("      hl.exec_cmd(\"wl-clipboard-history-daemon\")\n");
-            printf("  end)\n\n");
-            printf("  -- 2. Bind SUPER+V (Win+V) to launch popup GUI\n");
+            printf("  -- Bind SUPER+V (Win+V) to launch popup GUI\n");
             printf("  hl.bind(mainMod .. \" + V\", hl.dsp.exec_cmd(\"wl-clipboard-history-gui\"))\n\n");
-            printf("  -- 3. Add window rules for floating/centering\n");
-            printf("  hl.exec_cmd(\"hyprctl keyword windowrulev2 float,class:^(org.hyprland.wl-clipboard-history)$\")\n");
-            printf("  hl.exec_cmd(\"hyprctl keyword windowrulev2 size 450 500,class:^(org.hyprland.wl-clipboard-history)$\")\n");
-            printf("  hl.exec_cmd(\"hyprctl keyword windowrulev2 center,class:^(org.hyprland.wl-clipboard-history)$\")\n");
-            printf("  hl.exec_cmd(\"hyprctl keyword windowrulev2 pin,class:^(org.hyprland.wl-clipboard-history)$\")\n");
-            printf("  hl.exec_cmd(\"hyprctl keyword windowrulev2 stayfocused,class:^(org.hyprland.wl-clipboard-history)$\")\n");
+            printf("  -- Clipboard history window rules (Floating/cursor-centered & auto-pkill reload)\n");
+            printf("  hl.exec_cmd(\"pkill -f wl-clipboard-history-daemon; wl-clipboard-history-daemon &\")\n");
+            printf("  hl.exec_cmd(\"hyprctl keyword windowrulev2 float,title:^(Clipboard History)$\")\n");
+            printf("  hl.exec_cmd(\"hyprctl keyword windowrulev2 size 450 500,title:^(Clipboard History)$\")\n");
+            printf("  hl.exec_cmd(\"hyprctl keyword windowrulev2 move cursor -50% -50%,title:^(Clipboard History)$\")\n");
+            printf("  hl.exec_cmd(\"hyprctl keyword windowrulev2 pin,title:^(Clipboard History)$\")\n");
+            printf("  hl.exec_cmd(\"hyprctl keyword windowrulev2 stayfocused,title:^(Clipboard History)$\")\n");
             return 0;
         }
     }
