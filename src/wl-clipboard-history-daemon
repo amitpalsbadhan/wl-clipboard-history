@@ -1,0 +1,155 @@
+#!/usr/bin/env bash
+
+# Clipboard Tracker Daemon for wl-clipboard-history
+
+CONFIG_DIR="$HOME/.config/wl-clipboard-history"
+CACHE_DIR="$HOME/.cache/wl-clipboard-history"
+MEDIA_DIR="$CACHE_DIR/media"
+HISTORY_FILE="$CACHE_DIR/history.txt"
+CONFIG_FILE="$CONFIG_DIR/config.ini"
+
+mkdir -p "$CONFIG_DIR" "$MEDIA_DIR"
+[[ -f "$HISTORY_FILE" ]] || touch "$HISTORY_FILE"
+
+# Robust configuration parser mimicking the C implementation
+get_config_val() {
+    local key="$1"
+    local default="$2"
+    if [[ -f "$CONFIG_FILE" ]]; then
+        while IFS= read -r line || [[ -n "$line" ]]; do
+            # Trim leading/trailing whitespace
+            line="${line#"${line%%[![:space:]]*}"}"
+            line="${line%"${line##*[![:space:]]}"}"
+            
+            # Ignore comments and section headers
+            if [[ -z "$line" || "$line" == "#"* || "$line" == ";"* || "$line" == "["* ]]; then
+                continue
+            fi
+            
+            if [[ "$line" == *=* ]]; then
+                local k="${line%%=*}"
+                local v="${line#*=}"
+                
+                # Trim k
+                k="${k#"${k%%[![:space:]]*}"}"
+                k="${k%"${k##*[![:space:]]}"}"
+                
+                if [[ "$k" == "$key" ]]; then
+                    # Trim v
+                    v="${v#"${v%%[![:space:]]*}"}"
+                    v="${v%"${v##*[![:space:]]}"}"
+                    
+                    # Strip quotes
+                    if [[ "$v" == \"*\" || "$v" == \'*\' ]]; then
+                        v="${v:1:${#v}-2}"
+                    fi
+                    echo "$v"
+                    return
+                fi
+            fi
+        done < "$CONFIG_FILE"
+    fi
+    echo "$default"
+}
+
+MAX_HISTORY=$(get_config_val "max_history" "50")
+
+handle_change() {
+    local targets
+    targets=$(wl-paste --list-types 2>/dev/null)
+    if [[ -z "$targets" ]]; then
+        return
+    fi
+
+    local type=""
+    local content=""
+
+    if echo "$targets" | grep -q -E "image/png|image/jpeg"; then
+        type="image"
+        local tmp_img
+        tmp_img=$(mktemp)
+        wl-paste -t image/png > "$tmp_img" 2>/dev/null
+        if [[ ! -s "$tmp_img" ]]; then
+            rm -f "$tmp_img"
+            return
+        fi
+        local file_hash
+        file_hash=$(sha256sum "$tmp_img" | cut -d' ' -f1)
+        local cached_img="$MEDIA_DIR/$file_hash.png"
+        if [[ -f "$cached_img" ]]; then
+            rm -f "$tmp_img"
+        else
+            mv "$tmp_img" "$cached_img"
+        fi
+        content="$cached_img"
+    elif echo "$targets" | grep -q "text/uri-list"; then
+        type="files"
+        content=$(wl-paste -t text/uri-list 2>/dev/null)
+        content="${content//$'\n'/$'\a'}"
+    elif echo "$targets" | grep -q "text/plain"; then
+        type="text"
+        content=$(wl-paste -t text/plain 2>/dev/null)
+        content="${content//$'\n'/$'\a'}"
+    else
+        return
+    fi
+
+    if [[ -z "$content" ]]; then
+        return
+    fi
+
+    local new_entry="[$type]$content"
+
+    # Quick check if it is already the most recent entry to avoid file rewrite
+    local first_line=""
+    if [[ -f "$HISTORY_FILE" ]]; then
+        first_line=$(head -n 1 "$HISTORY_FILE" 2>/dev/null)
+    fi
+
+    if [[ "$first_line" == "$new_entry" ]]; then
+        return
+    fi
+
+    local temp_history
+    temp_history=$(mktemp)
+
+    echo "$new_entry" > "$temp_history"
+    if [[ -f "$HISTORY_FILE" ]]; then
+        grep -v -F -x "$new_entry" "$HISTORY_FILE" >> "$temp_history" 2>/dev/null
+    fi
+
+    local total_lines
+    total_lines=$(wc -l < "$temp_history")
+    
+    local final_history
+    final_history=$(mktemp)
+
+    if (( total_lines > MAX_HISTORY )); then
+        # Identify files/images in rows to be deleted
+        tail -n +$((MAX_HISTORY + 1)) "$temp_history" | while read -r discarded_line; do
+            if [[ "$discarded_line" == "[image]"* ]]; then
+                local img_to_del="${discarded_line#"[image]"}"
+                rm -f "$img_to_del"
+            fi
+        done
+        head -n "$MAX_HISTORY" "$temp_history" > "$final_history"
+    else
+        cat "$temp_history" > "$final_history"
+    fi
+
+    mv "$final_history" "$HISTORY_FILE"
+    rm -f "$temp_history"
+}
+
+if [[ "$1" == "--update" ]]; then
+    handle_change
+else
+    RESET_ON_LOGIN=$(get_config_val "reset_on_login" "false")
+    if [[ "$RESET_ON_LOGIN" == "true" ]]; then
+        echo -n "" > "$HISTORY_FILE"
+        rm -f "$MEDIA_DIR"/* 2>/dev/null
+    fi
+    
+    SCRIPT_PATH=$(realpath "$0")
+    exec wl-paste --watch "$SCRIPT_PATH" --update
+fi
