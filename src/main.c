@@ -360,10 +360,19 @@ static gboolean filter_history(GtkListBoxRow *row, gpointer user_data) {
     return match;
 }
 
+static gboolean focus_guard_active = FALSE;
+
+static gboolean enable_focus_guard(gpointer data) {
+    (void)data;
+    focus_guard_active = TRUE;
+    return G_SOURCE_REMOVE;
+}
+
 static void on_window_active_changed(GObject *object, GParamSpec *pspec, gpointer user_data) {
     (void)pspec;
     (void)user_data;
     GtkWindow *window = GTK_WINDOW(object);
+    if (!focus_guard_active) return;
     if (!gtk_window_is_active(window)) {
         gtk_window_destroy(window);
     }
@@ -433,7 +442,9 @@ static void on_activate(GtkApplication *app, gpointer user_data) {
     g_signal_connect(key_controller, "key-pressed", G_CALLBACK(on_key_pressed), window);
     gtk_widget_add_controller(window, key_controller);
 
-    // Close when window loses focus (clicked off screen)
+    // Initialize focus guard and connect deactivation listener
+    focus_guard_active = FALSE;
+    g_timeout_add(300, enable_focus_guard, NULL);
     g_signal_connect(window, "notify::is-active", G_CALLBACK(on_window_active_changed), NULL);
 
     gtk_window_present(GTK_WINDOW(window));
