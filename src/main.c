@@ -360,6 +360,15 @@ static gboolean filter_history(GtkListBoxRow *row, gpointer user_data) {
     return match;
 }
 
+static void on_window_active_changed(GObject *object, GParamSpec *pspec, gpointer user_data) {
+    (void)pspec;
+    (void)user_data;
+    GtkWindow *window = GTK_WINDOW(object);
+    if (!gtk_window_is_active(window)) {
+        gtk_window_destroy(window);
+    }
+}
+
 static void on_activate(GtkApplication *app, gpointer user_data) {
     (void)user_data;
 
@@ -375,10 +384,23 @@ static void on_activate(GtkApplication *app, gpointer user_data) {
     gtk_widget_set_name(main_box, "main-window");
     gtk_window_set_child(GTK_WINDOW(window), main_box);
 
-    // Search entry
+    // Header Box for Search bar and Close button
+    GtkWidget *header_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
+    gtk_widget_set_name(header_box, "header-bar");
+    gtk_box_append(GTK_BOX(main_box), header_box);
+
+    // Search entry (expanded to take all space)
     GtkWidget *search_entry = gtk_search_entry_new();
     gtk_widget_set_name(search_entry, "search-entry");
-    gtk_box_append(GTK_BOX(main_box), search_entry);
+    gtk_widget_set_hexpand(search_entry, TRUE);
+    gtk_box_append(GTK_BOX(header_box), search_entry);
+
+    // Beautiful circular Close button
+    GtkWidget *close_button = gtk_button_new_from_icon_name("window-close-symbolic");
+    gtk_widget_set_name(close_button, "close-button");
+    gtk_widget_set_valign(close_button, GTK_ALIGN_CENTER);
+    g_signal_connect_swapped(close_button, "clicked", G_CALLBACK(gtk_window_destroy), window);
+    gtk_box_append(GTK_BOX(header_box), close_button);
 
     // Scroll window and ListBox
     GtkWidget *scroll_win = gtk_scrolled_window_new();
@@ -410,6 +432,9 @@ static void on_activate(GtkApplication *app, gpointer user_data) {
     GtkEventController *key_controller = gtk_event_controller_key_new();
     g_signal_connect(key_controller, "key-pressed", G_CALLBACK(on_key_pressed), window);
     gtk_widget_add_controller(window, key_controller);
+
+    // Close when window loses focus (clicked off screen)
+    g_signal_connect(window, "notify::is-active", G_CALLBACK(on_window_active_changed), NULL);
 
     gtk_window_present(GTK_WINDOW(window));
 }

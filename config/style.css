@@ -4,18 +4,38 @@
     border-radius: 12px;
     padding: 6px;
 }
+#header-bar {
+    padding: 6px;
+    background-color: transparent;
+    border-bottom: 1px solid #1e1e20;
+}
+#close-button {
+    background-color: transparent;
+    color: #a6adc8;
+    border: none;
+    border-radius: 50%;
+    padding: 8px;
+    margin-right: 4px;
+    transition: all 0.2s ease-in-out;
+}
+#close-button:hover {
+    background-color: rgba(255, 121, 198, 0.15);
+    color: #ff79c6;
+}
 #search-entry {
     background-color: #1e1e20;
     color: #f8f8f2;
     border: 1px solid #2d2d30;
     border-radius: 8px;
     padding: 10px;
-    margin: 10px;
+    margin: 4px;
     font-family: @font_face;
     font-size: @font_sizept;
+    transition: all 0.2s ease-in-out;
 }
 #search-entry:focus {
     border: 1px solid #ff79c6;
+    box-shadow: 0 0 4px rgba(255, 121, 198, 0.4);
 }
 #history-list {
     background-color: transparent;
@@ -29,6 +49,7 @@
     font-size: @font_sizept;
     border-radius: 6px;
     margin: 2px 6px;
+    transition: all 0.2s ease-in-out;
 }
 .history-row:hover {
     background-color: rgba(255, 121, 198, 0.1);
