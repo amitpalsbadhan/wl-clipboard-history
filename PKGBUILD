@@ -8,20 +8,15 @@ url="https://github.com/yourusername/wl-clipboard-history"
 license=('MIT')
 depends=('gtk4' 'wl-clipboard' 'wtype')
 makedepends=('make' 'gcc' 'pkg-config')
-source=('Makefile'
-        'src/main.c'
-        'src/config.c'
-        'src/config.h'
-        'src/wl-clipboard-history-daemon'
-        'config/config.ini'
-        'config/style.css')
-sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
 
 build() {
+  cd "$startdir"
+  make clean
   make
 }
 
 package() {
+  cd "$startdir"
   # Install binaries
   install -Dm755 wl-clipboard-history-gui "$pkgdir/usr/bin/wl-clipboard-history-gui"
   install -Dm755 src/wl-clipboard-history-daemon "$pkgdir/usr/bin/wl-clipboard-history-daemon"

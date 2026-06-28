@@ -1,0 +1,12 @@
+# Build outputs
+/wl-clipboard-history-gui
+/test_config
+/test_gui_logic
+
+# Arch packaging files
+/pkg/
+*.pkg.tar.zst
+
+# SDD and review packages
+/.superpowers/
+*.diff
