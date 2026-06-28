@@ -102,6 +102,84 @@ static void load_custom_css(void) {
     g_object_unref(provider);
 }
 
+static gboolean is_active_window_terminal(void) {
+    FILE *pipe = popen("hyprctl activewindow", "r");
+    if (!pipe) return FALSE;
+    char buffer[1024];
+    gboolean is_term = FALSE;
+    while (fgets(buffer, sizeof(buffer), pipe)) {
+        // Check class of active window
+        if (strstr(buffer, "class: Alacritty") ||
+            strstr(buffer, "class: kitty") ||
+            strstr(buffer, "class: foot") ||
+            strstr(buffer, "class: org.wezfurlong.wezterm") ||
+            strstr(buffer, "class: Wezterm") ||
+            strstr(buffer, "class: konsole") ||
+            strstr(buffer, "class: gnome-terminal-server") ||
+            strstr(buffer, "class: blackbox") ||
+            strstr(buffer, "class: urxvt") ||
+            strstr(buffer, "class: xterm-256color") ||
+            strstr(buffer, "class: XTerm")) {
+            is_term = TRUE;
+            break;
+        }
+    }
+    pclose(pipe);
+    return is_term;
+}
+
+static void on_row_selected(GtkListBox *list_box, GtkListBoxRow *row, gpointer user_data) {
+    (void)list_box;
+    if (!row) return;
+
+    const char *type = g_object_get_data(G_OBJECT(row), "type");
+    const char *content = g_object_get_data(G_OBJECT(row), "content");
+
+    if (!type || !content) return;
+
+    // Copy to both clipboard and primary selection for perfect clipboard compatibility
+    FILE *pipe = NULL;
+    if (strcmp(type, "text") == 0) {
+        pipe = popen("wl-copy", "w");
+        if (pipe) { fputs(content, pipe); pclose(pipe); }
+        pipe = popen("wl-copy --primary", "w");
+        if (pipe) { fputs(content, pipe); pclose(pipe); }
+    } else if (strcmp(type, "image") == 0) {
+        char cmd[512];
+        snprintf(cmd, sizeof(cmd), "wl-copy -t image/png < \"%s\"", content);
+        int res1 = system(cmd);
+        snprintf(cmd, sizeof(cmd), "wl-copy --primary -t image/png < \"%s\"", content);
+        int res2 = system(cmd);
+        (void)res1;
+        (void)res2;
+    } else if (strcmp(type, "files") == 0) {
+        pipe = popen("wl-copy -t text/uri-list", "w");
+        if (pipe) { fputs(content, pipe); pclose(pipe); }
+        pipe = popen("wl-copy --primary -t text/uri-list", "w");
+        if (pipe) { fputs(content, pipe); pclose(pipe); }
+    }
+
+    // Detect if terminal window is active before closing
+    gboolean target_is_terminal = is_active_window_terminal();
+
+    // Close application window
+    GtkWindow *window = GTK_WINDOW(user_data);
+    gtk_window_destroy(window);
+
+    // Perform auto-paste if configured
+    if (app_config.paste_on_select) {
+        if (target_is_terminal) {
+            // Terminal: Send Ctrl+Shift+V to prevent accidental process termination/signals
+            int res = system("sleep 0.12 && wtype -M ctrl -M shift -P v -m shift -m ctrl &");
+            (void)res;
+        } else {
+            // Standard App: Send standard Ctrl+V
+            int res = system("sleep 0.12 && wtype -M ctrl -P v -m ctrl &");
+            (void)res;
+        }
+    }
+}
+
 static gboolean on_key_pressed(GtkEventControllerKey *controller, guint keyval, guint keycode, GdkModifierType state, gpointer user_data) {
     (void)controller;
     (void)keycode;
@@ -111,6 +189,56 @@ static gboolean on_key_pressed(GtkEventControllerKey *controller, guint keyval, 
         gtk_window_destroy(GTK_WINDOW(window));
         return TRUE;
     }
+
+    if (keyval == GDK_KEY_Return || keyval == GDK_KEY_KP_Enter) {
+        GtkWidget *list_box = g_object_get_data(G_OBJECT(window), "list-box");
+        if (list_box) {
+            GtkListBoxRow *row = gtk_list_box_get_selected_row(GTK_LIST_BOX(list_box));
+            if (!row) {
+                // If no row is selected, let's find the first visible row
+                GtkWidget *child = gtk_widget_get_first_child(list_box);
+                while (child) {
+                    if (GTK_IS_LIST_BOX_ROW(child)) {
+                        GtkListBoxRow *r = GTK_LIST_BOX_ROW(child);
+                        if (gtk_widget_get_child_visible(GTK_WIDGET(r)) && gtk_widget_get_visible(GTK_WIDGET(r))) {
+                            row = r;
+                            break;
+                        }
+                    }
+                    child = gtk_widget_get_next_sibling(child);
+                }
+            }
+            if (row) {
+                g_signal_emit_by_name(list_box, "row-activated", row);
+                return TRUE;
+            }
+        }
+    }
+
+    if (keyval == GDK_KEY_Down) {
+        GtkWidget *search_entry = g_object_get_data(G_OBJECT(window), "search-entry");
+        GtkWidget *list_box = g_object_get_data(G_OBJECT(window), "list-box");
+        if (search_entry && list_box && gtk_widget_has_focus(search_entry)) {
+            gtk_widget_grab_focus(list_box);
+            // Also select the first visible row if nothing is selected
+            GtkListBoxRow *row = gtk_list_box_get_selected_row(GTK_LIST_BOX(list_box));
+            if (!row) {
+                GtkWidget *child = gtk_widget_get_first_child(list_box);
+                while (child) {
+                    if (GTK_IS_LIST_BOX_ROW(child)) {
+                        GtkListBoxRow *r = GTK_LIST_BOX_ROW(child);
+                        if (gtk_widget_get_child_visible(GTK_WIDGET(r)) && gtk_widget_get_visible(GTK_WIDGET(r))) {
+                            gtk_list_box_select_row(GTK_LIST_BOX(list_box), r);
+                            break;
+                        }
+                    }
+                    child = gtk_widget_get_next_sibling(child);
+                }
+            }
+            return TRUE;
+        }
+    }
+
     return FALSE;
 }
 
@@ -266,6 +394,13 @@ static void on_activate(GtkApplication *app, gpointer user_data) {
 
     // Grab focus on search on launch
     gtk_widget_grab_focus(search_entry);
+
+    // Store references on window for key pressed and row selection handling
+    g_object_set_data(G_OBJECT(window), "list-box", list_box);
+    g_object_set_data(G_OBJECT(window), "search-entry", search_entry);
+
+    // Connect row-activated to copy & paste handler
+    g_signal_connect(list_box, "row-activated", G_CALLBACK(on_row_selected), window);
 
     // Close on Escape
     GtkEventController *key_controller = gtk_event_controller_key_new();
