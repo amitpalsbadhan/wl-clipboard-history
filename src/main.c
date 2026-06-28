@@ -114,6 +114,120 @@ static gboolean on_key_pressed(GtkEventControllerKey *controller, guint keyval, 
     return FALSE;
 }
 
+static void populate_history_list(GtkWidget *list_box) {
+    char history_path[512];
+    const char *home = getenv("HOME");
+    if (!home) home = "";
+    snprintf(history_path, sizeof(history_path), "%s/.cache/wl-clipboard-history/history.txt", home);
+
+    FILE *f = fopen(history_path, "r");
+    if (!f) return;
+
+    char line[16384];
+    while (fgets(line, sizeof(line), f)) {
+        // Remove trailing newline
+        line[strcspn(line, "\n")] = '\0';
+        
+        char *type_start = strchr(line, '[');
+        char *type_end = strchr(line, ']');
+        if (!type_start || !type_end || type_start != line) continue;
+
+        *type_end = '\0';
+        char *type = type_start + 1;
+        char *content = type_end + 1;
+
+        GtkWidget *row_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
+        gtk_widget_add_css_class(row_box, "history-row");
+
+        GtkWidget *icon = NULL;
+        GtkWidget *content_widget = NULL;
+
+        // Store full original formatted content in row widget metadata
+        GtkWidget *row = gtk_list_box_row_new();
+        g_object_set_data_full(G_OBJECT(row), "type", g_strdup(type), (GDestroyNotify)g_free);
+        // Restore newline markers (\a -> \n) for copying
+        char *restored_content = g_strdup(content);
+        for (int i = 0; restored_content[i]; i++) {
+            if (restored_content[i] == '\a') restored_content[i] = '\n';
+        }
+        g_object_set_data_full(G_OBJECT(row), "content", restored_content, (GDestroyNotify)g_free);
+
+        if (strcmp(type, "text") == 0) {
+            icon = gtk_image_new_from_icon_name("edit-select-all-symbolic");
+            // Truncate preview text
+            char preview[128];
+            strncpy(preview, content, sizeof(preview) - 1);
+            preview[sizeof(preview) - 1] = '\0';
+            for (int i = 0; preview[i]; i++) {
+                if (preview[i] == '\a') preview[i] = ' ';
+            }
+            content_widget = gtk_label_new(preview);
+            gtk_label_set_xalign(GTK_LABEL(content_widget), 0.0);
+            gtk_widget_add_css_class(content_widget, "item-text");
+        } else if (strcmp(type, "image") == 0) {
+            icon = gtk_image_new_from_icon_name("image-x-generic-symbolic");
+            // Render miniature thumbnail
+            GdkTexture *texture = gdk_texture_new_from_filename(content, NULL);
+            if (texture) {
+                content_widget = gtk_picture_new_for_paintable(GDK_PAINTABLE(texture));
+                gtk_widget_set_size_request(content_widget, 100, 60);
+                g_object_unref(texture);
+            } else {
+                content_widget = gtk_label_new("Image preview missing");
+            }
+            gtk_widget_add_css_class(content_widget, "item-image");
+        } else if (strcmp(type, "files") == 0) {
+            icon = gtk_image_new_from_icon_name("folder-symbolic");
+            // Display simple file count or path preview
+            int count = 0;
+            if (content[0] != '\0') {
+                count = 1;
+                for (int i = 0; content[i]; i++) {
+                    if (content[i] == '\a') count++;
+                }
+            }
+            char preview[64];
+            snprintf(preview, sizeof(preview), "%d files copied", count);
+            content_widget = gtk_label_new(preview);
+            gtk_label_set_xalign(GTK_LABEL(content_widget), 0.0);
+        }
+
+        if (icon) {
+            gtk_widget_add_css_class(icon, "item-icon");
+            gtk_box_append(GTK_BOX(row_box), icon);
+        }
+        if (content_widget) {
+            gtk_box_append(GTK_BOX(row_box), content_widget);
+        }
+
+        gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), row_box);
+        gtk_list_box_append(GTK_LIST_BOX(list_box), row);
+    }
+    fclose(f);
+}
+
+static gboolean filter_history(GtkListBoxRow *row, gpointer user_data) {
+    GtkSearchEntry *search_entry = GTK_SEARCH_ENTRY(user_data);
+    const char *search_text = gtk_editable_get_text(GTK_EDITABLE(search_entry));
+    if (!search_text || strlen(search_text) == 0) {
+        return TRUE;
+    }
+
+    const char *content = g_object_get_data(G_OBJECT(row), "content");
+    if (!content) return FALSE;
+
+    // Case insensitive match using GLib utf8 strdown
+    char *content_lower = g_utf8_strdown(content, -1);
+    char *search_lower = g_utf8_strdown(search_text, -1);
+
+    gboolean match = (strstr(content_lower, search_lower) != NULL);
+
+    g_free(content_lower);
+    g_free(search_lower);
+
+    return match;
+}
+
 static void on_activate(GtkApplication *app, gpointer user_data) {
     (void)user_data;
 
@@ -142,6 +256,13 @@ static void on_activate(GtkApplication *app, gpointer user_data) {
     GtkWidget *list_box = gtk_list_box_new();
     gtk_widget_set_name(list_box, "history-list");
     gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scroll_win), list_box);
+
+    // Populate history items
+    populate_history_list(list_box);
+
+    // Set up search filter function
+    g_signal_connect_swapped(search_entry, "search-changed", G_CALLBACK(gtk_list_box_invalidate_filter), list_box);
+    gtk_list_box_set_filter_func(GTK_LIST_BOX(list_box), filter_history, search_entry, NULL);
 
     // Grab focus on search on launch
     gtk_widget_grab_focus(search_entry);
