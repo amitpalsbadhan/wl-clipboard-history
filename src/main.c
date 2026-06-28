@@ -42,7 +42,9 @@ static char *replace_string(const char *orig, const char *rep, const char *with)
 
 static void load_custom_css(void) {
     char css_path[512];
-    snprintf(css_path, sizeof(css_path), "%s/.config/wl-clipboard-history/style.css", getenv("HOME"));
+    const char *home = getenv("HOME");
+    if (!home) home = "";
+    snprintf(css_path, sizeof(css_path), "%s/.config/wl-clipboard-history/style.css", home);
 
     GtkCssProvider *provider = gtk_css_provider_new();
     
@@ -59,6 +61,7 @@ static void load_custom_css(void) {
 
     fseek(f, 0, SEEK_END);
     long size = ftell(f);
+    if (size < 0) size = 0;
     fseek(f, 0, SEEK_SET);
 
     char *css_data = malloc(size + 1);
@@ -153,7 +156,9 @@ static void on_activate(GtkApplication *app, gpointer user_data) {
 
 int main(int argc, char **argv) {
     char config_path[512];
-    snprintf(config_path, sizeof(config_path), "%s/.config/wl-clipboard-history/config.ini", getenv("HOME"));
+    const char *home = getenv("HOME");
+    if (!home) home = "";
+    snprintf(config_path, sizeof(config_path), "%s/.config/wl-clipboard-history/config.ini", home);
     load_config(config_path, &app_config);
 
     GtkApplication *app = gtk_application_new("org.hyprland.wl-clipboard-history", G_APPLICATION_DEFAULT_FLAGS);
