@@ -10,3 +10,6 @@
 # SDD and review packages
 /.superpowers/
 *.diff
+
+# Design and plan docs
+/docs/superpowers/
