@@ -415,6 +415,29 @@ static void on_activate(GtkApplication *app, gpointer user_data) {
 }
 
 int main(int argc, char **argv) {
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
+            printf("wl-clipboard-history-gui: Fast C/GTK4 Clipboard popup for Hyprland\n\n");
+            printf("Usage: wl-clipboard-history-gui [options]\n\n");
+            printf("Options:\n");
+            printf("  -h, --help     Show this help message and exit\n\n");
+            printf("Hyprland 2026 Lua Setup:\n");
+            printf("  -- 1. Start tracker daemon inside hyprland.start\n");
+            printf("  hl.on(\"hyprland.start\", function()\n");
+            printf("      hl.exec_cmd(\"wl-clipboard-history-daemon\")\n");
+            printf("  end)\n\n");
+            printf("  -- 2. Bind SUPER+V (Win+V) to launch popup GUI\n");
+            printf("  hl.bind(mainMod .. \" + V\", hl.dsp.exec_cmd(\"wl-clipboard-history-gui\"))\n\n");
+            printf("  -- 3. Add window rules for floating/centering\n");
+            printf("  hl.exec_cmd(\"hyprctl keyword windowrulev2 float,class:^(org.hyprland.wl-clipboard-history)$\")\n");
+            printf("  hl.exec_cmd(\"hyprctl keyword windowrulev2 size 450 500,class:^(org.hyprland.wl-clipboard-history)$\")\n");
+            printf("  hl.exec_cmd(\"hyprctl keyword windowrulev2 center,class:^(org.hyprland.wl-clipboard-history)$\")\n");
+            printf("  hl.exec_cmd(\"hyprctl keyword windowrulev2 pin,class:^(org.hyprland.wl-clipboard-history)$\")\n");
+            printf("  hl.exec_cmd(\"hyprctl keyword windowrulev2 stayfocused,class:^(org.hyprland.wl-clipboard-history)$\")\n");
+            return 0;
+        }
+    }
+
     char config_path[512];
     const char *home = getenv("HOME");
     if (!home) home = "";
